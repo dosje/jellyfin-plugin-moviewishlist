@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing version: ${VERSION}"
+
+      - name: Restore dependencies
+        run: dotnet restore Jellyfin.Plugin.MovieWishlist.sln
+
+      - name: Build in Release mode
+        run: dotnet build Jellyfin.Plugin.MovieWishlist.sln --no-restore -c Release
+
+      - name: Publish plugin
+        run: >
+          dotnet publish
+          Jellyfin.Plugin.MovieWishlist/Jellyfin.Plugin.MovieWishlist.csproj
+          -c Release
+          -o ./publish
+          --no-self-contained
+
+      - name: Create zip artifact
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ZIP_NAME="Jellyfin.Plugin.MovieWishlist_v${VERSION}.zip"
+          cd ./publish
+          zip "../${ZIP_NAME}" Jellyfin.Plugin.MovieWishlist.dll
+          cd ..
+          echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
+
+      - name: Compute MD5 checksum
+        id: checksum
+        run: |
+          CHECKSUM=$(md5sum "${{ env.ZIP_NAME }}" | awk '{ print $1 }')
+          echo "CHECKSUM=${CHECKSUM}" >> "$GITHUB_OUTPUT"
+          echo "MD5 checksum: ${CHECKSUM}"
+
+      - name: Generate manifest.json
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          CHECKSUM="${{ steps.checksum.outputs.CHECKSUM }}"
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          cat > manifest.json <<EOF
+          [
+            {
+              "guid": "a8f3c2d1-e4b5-4f76-9abc-def012345678",
+              "name": "Movie Wishlist DVR",
+              "overview": "Add movies to a watchlist and automatically schedule DVR recordings when they appear in the Live TV EPG.",
+              "description": "A Jellyfin-native plugin that monitors the built-in Live TV EPG and automatically schedules a DVR recording when a wishlisted film appears in the broadcast schedule.",
+              "owner": "dosje",
+              "category": "General",
+              "imageUrl": "",
+              "tags": ["dvr", "livetv", "wishlist", "movies"],
+              "versions": [
+                {
+                  "version": "${VERSION}",
+                  "changelog": "Initial release.",
+                  "targetAbi": "10.9.0.0",
+                  "sourceUrl": "https://github.com/dosje/jellyfin-plugin-moviewishlist/releases/download/v${VERSION}/Jellyfin.Plugin.MovieWishlist_v${VERSION}.zip",
+                  "checksum": "${CHECKSUM}",
+                  "timestamp": "${TIMESTAMP}"
+                }
+              ]
+            }
+          ]
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Movie Wishlist DVR v${{ steps.version.outputs.VERSION }}"
+          body: "See [CHANGELOG.md](CHANGELOG.md) for details."
+          make_latest: true
+          files: |
+            ${{ env.ZIP_NAME }}
+            manifest.json

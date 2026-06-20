@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Wishlist — Discover</title>
+    <link rel="stylesheet" href="wishlist.css">
+</head>
+<body>
+<div class="mw-page">
+    <div class="mw-header">
+        <h1><span>🎬</span> Movie Wishlist</h1>
+        <nav class="mw-tabs">
+            <a class="mw-tab active" href="/web/configurationpage?name=MovieWishlistDiscover">🎬 Discover</a>
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistWatchlist">📋 My Watchlist</a>
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistConfirmations">⚠️ Confirmations</a>
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistSettings">⚙️ Settings</a>
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistActivity">📜 Activity</a>
+        </nav>
+    </div>
+
+    <div class="mw-search-bar">
+        <input type="text" id="mw-search-input" placeholder="Search for a movie…" autocomplete="off" />
+        <button id="mw-search-btn">Search</button>
+    </div>
+
+    <div id="mw-error-box" class="mw-error" style="display:none;"></div>
+
+    <div id="mw-results-area">
+        <div class="mw-empty">
+            <div style="font-size:2.5rem;margin-bottom:12px;">🎬</div>
+            <strong>Discover Movies</strong>
+            <p>Type a movie title above to search TMDB and add it to your watchlist.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Detail overlay -->
+<div class="mw-detail-overlay hidden" id="mw-detail-overlay">
+    <div class="mw-detail-panel" id="mw-detail-panel">
+        <button class="mw-close-btn" id="mw-close-btn" title="Close">✕</button>
+        <div id="mw-detail-content">
+            <div class="mw-loading">Loading…</div>
+        </div>
+    </div>
+</div>
+
+<script src="wishlist.js"></script>
+<script>WishlistApp.initDiscover();</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore Jellyfin.Plugin.MovieWishlist.sln
+
+      - name: Build solution
+        run: dotnet build Jellyfin.Plugin.MovieWishlist.sln --no-restore -c Release
+
+      - name: Run tests
+        if: hashFiles('Jellyfin.Plugin.MovieWishlist.Tests/**') != ''
+        run: >
+          dotnet test
+          Jellyfin.Plugin.MovieWishlist.Tests/Jellyfin.Plugin.MovieWishlist.Tests.csproj
+          --no-build
+          -c Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: hashFiles('Jellyfin.Plugin.MovieWishlist.Tests/**') != '' && (success() || failure())
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults/test-results.trx
+          retention-days: 14

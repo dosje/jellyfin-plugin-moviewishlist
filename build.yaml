@@ -1,0 +1,19 @@
+---
+name: "Movie Wishlist DVR"
+guid: "a8f3c2d1-e4b5-4f76-9abc-def012345678"
+version: "1.0.0.0"
+overview: "Add movies to a watchlist and automatically schedule DVR recordings when they appear in the Live TV EPG."
+description: "A Jellyfin-native plugin that monitors the built-in Live TV EPG and automatically schedules a DVR recording when a wishlisted film appears in the broadcast schedule. No Radarr, no Sonarr, no external middleware required — only a TMDB API key."
+owner: "dosje"
+category: "General"
+tags:
+  - dvr
+  - livetv
+  - wishlist
+  - movies
+artifacts:
+  - "Jellyfin.Plugin.MovieWishlist.dll"
+targetAbi: "10.9.0.0"
+sourceUrl: ""
+checksum: ""
+timestamp: "2026-06-20T00:00:00Z"

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Wishlist — My Watchlist</title>
+    <link rel="stylesheet" href="wishlist.css">
+</head>
+<body>
+<div class="mw-page">
+    <div class="mw-header">
+        <h1><span>📋</span> My Watchlist</h1>
+        <nav class="mw-tabs">
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistDiscover">🎬 Discover</a>
+            <a class="mw-tab active" href="/web/configurationpage?name=MovieWishlistWatchlist">📋 My Watchlist</a>
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistConfirmations">⚠️ Confirmations</a>
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistSettings">⚙️ Settings</a>
+            <a class="mw-tab" href="/web/configurationpage?name=MovieWishlistActivity">📜 Activity</a>
+        </nav>
+    </div>
+
+    <div id="mw-error-box" class="mw-error" style="display:none;"></div>
+
+    <div id="mw-watchlist-area">
+        <div class="mw-loading">Loading your watchlist…</div>
+    </div>
+</div>
+
+<script src="wishlist.js"></script>
+<script>WishlistApp.initWatchlist();</script>
+</body>
+</html>

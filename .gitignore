@@ -1,0 +1,24 @@
+# .NET build output
+bin/
+obj/
+publish/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Test results
+TestResults/
+*.trx
+
+# NuGet
+*.nupkg
+.nuget/
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
