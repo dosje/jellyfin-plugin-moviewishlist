@@ -1,7 +1,8 @@
 using Jellyfin.Plugin.MovieWishlist.Data;
 using Jellyfin.Plugin.MovieWishlist.ScheduledTasks;
 using Jellyfin.Plugin.MovieWishlist.Services;
-using MediaBrowser.Common.Plugins;
+using MediaBrowser.Controller;
+using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.MovieWishlist;
@@ -12,7 +13,7 @@ namespace Jellyfin.Plugin.MovieWishlist;
 public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     /// <inheritdoc />
-    public void RegisterServices(IServiceCollection services, IServiceProvider applicationServiceProvider)
+    public void RegisterServices(IServiceCollection services, IServerApplicationHost applicationHost)
     {
         services.AddSingleton<DatabaseManager>();
         services.AddSingleton<TmdbService>();
