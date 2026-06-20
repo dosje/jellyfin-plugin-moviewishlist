@@ -2,7 +2,6 @@ using Jellyfin.Plugin.MovieWishlist.Data;
 using Jellyfin.Plugin.MovieWishlist.ScheduledTasks;
 using Jellyfin.Plugin.MovieWishlist.Services;
 using MediaBrowser.Common.Plugins;
-using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.MovieWishlist;

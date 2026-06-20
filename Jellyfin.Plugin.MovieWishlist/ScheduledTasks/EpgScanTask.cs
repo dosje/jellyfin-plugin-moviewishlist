@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.MovieWishlist.Data;
 using Jellyfin.Plugin.MovieWishlist.Data.Models;
 using Jellyfin.Plugin.MovieWishlist.Services;
-using MediaBrowser.Controller.Notifications;
-using MediaBrowser.Model.Notifications;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -19,7 +17,6 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
         private readonly EpgMatchingService _epgMatcher;
         private readonly RecordingService _recorder;
         private readonly LibraryCheckService _libraryChecker;
-        private readonly INotificationManager _notificationManager;
         private readonly ILogger<EpgScanTask> _logger;
 
         public EpgScanTask(
@@ -27,14 +24,12 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
             EpgMatchingService epgMatcher,
             RecordingService recorder,
             LibraryCheckService libraryChecker,
-            INotificationManager notificationManager,
             ILogger<EpgScanTask> logger)
         {
             _db = db;
             _epgMatcher = epgMatcher;
             _recorder = recorder;
             _libraryChecker = libraryChecker;
-            _notificationManager = notificationManager;
             _logger = logger;
         }
 
@@ -160,20 +155,9 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
                                 WishlistItemId = item.Id
                             });
 
-                            try
-                            {
-                                await _notificationManager.SendNotification(new NotificationRequest
-                                {
-                                    Name = "Movie Wishlist",
-                                    Description = $"Confirm EPG match for '{item.Title}': found '{match.ProgramTitle}' on {match.ChannelName} at {match.StartTime:g}.",
-                                    UserId = Guid.Parse(item.UserId),
-                                    NotificationType = NotificationType.TaskCompleted
-                                }, ct);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Failed to send NeedsConfirmation notification for '{Title}'.", item.Title);
-                            }
+                            _logger.LogInformation(
+                                "User {UserId}: confirm EPG match for '{Title}' — found '{Program}' on {Channel} at {Time}.",
+                                item.UserId, item.Title, match.ProgramTitle, match.ChannelName, match.StartTime);
 
                             matchIndex++;
                             progress.Report(40 + matchIndex * progressPerMatch);
@@ -290,20 +274,9 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
                                 toSchedule.IsHd = match.IsHd;
                                 _db.UpdateWishlistItem(toSchedule);
 
-                                try
-                                {
-                                    await _notificationManager.SendNotification(new NotificationRequest
-                                    {
-                                        Name = "Movie Wishlist",
-                                        Description = $"'{item.Title}' is airing on {match.ChannelName} at {match.StartTime:g} — recording scheduled.",
-                                        UserId = Guid.Parse(toSchedule.UserId),
-                                        NotificationType = NotificationType.TaskCompleted
-                                    }, ct);
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogWarning(ex, "Failed to send schedule notification to user {UserId}.", toSchedule.UserId);
-                                }
+                                _logger.LogInformation(
+                                    "User {UserId}: '{Title}' scheduled on {Channel} at {Time}.",
+                                    toSchedule.UserId, item.Title, match.ChannelName, match.StartTime);
                             }
 
                             _db.AddActivityLog(new ActivityLog
