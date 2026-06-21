@@ -4,7 +4,7 @@ using Jellyfin.Plugin.MovieWishlist.Services;
 using Jellyfin.Plugin.MovieWishlist.Services.Dto;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Model.Querying;
+using MediaBrowser.Controller.LiveTv;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -30,9 +30,7 @@ public class EpgMatchingServiceTests
     /// </summary>
     private static BaseItem MakeProgram(string name, int? year, DateTime startTime, Guid channelId)
     {
-        // Use the concrete Video type (which has all the properties we need)
-        // rather than trying to instantiate the sealed LiveTvProgram.
-        var program = new MediaBrowser.Controller.Entities.TV.Episode();
+        var program = new LiveTvProgram();
         program.Name = name;
         program.ProductionYear = year;
         program.StartDate = startTime;

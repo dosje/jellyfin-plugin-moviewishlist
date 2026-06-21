@@ -24,8 +24,8 @@ public class TmdbService
         };
     }
 
-    // Internal constructor for testability — allows injecting a mock HttpClient.
-    internal TmdbService(ILogger<TmdbService> logger, HttpClient httpClient)
+    // Secondary constructor for testability — allows injecting a mock HttpClient.
+    public TmdbService(ILogger<TmdbService> logger, HttpClient httpClient)
     {
         _logger = logger;
         _httpClient = httpClient;
