@@ -2,6 +2,16 @@
 
 All notable changes to Movie Wishlist DVR are documented in this file.
 
+## [1.0.2.0] - 2026-06-21
+
+### Added
+- Channel subscription reminders — users can subscribe to any Live TV channel and select days of the week; the plugin scans the EPG and sends a per-user in-session notification for each upcoming show on subscribed channels.
+- `ChannelReminderTask` scheduled task (runs daily, configurable) — queries EPG programs within the configured look-ahead window, notifies only the subscribing user via `ISessionManager`, and deduplicates against a `ChannelReminderLog` table.
+- `SubscriptionController` REST API — `GET /channels`, `GET/POST/PUT/DELETE /subscriptions` endpoints, fully per-user and authenticated.
+- Subscriptions tab added to all plugin pages (Discover, Watchlist, Confirmations, Settings, Activity).
+- New `subscriptions.html` page with channel picker, day-of-week checkboxes, and inline edit/remove.
+- `SubscriptionDaysAhead` setting in plugin configuration (default: 1 day); exposed in the Settings page.
+
 ## [1.0.1.0] - 2026-06-21
 
 ### Fixed
