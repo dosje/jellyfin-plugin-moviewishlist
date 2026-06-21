@@ -130,12 +130,16 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
                     {
                         await _sessionManager.SendMessageToUserSessions(
                             new List<Guid> { userGuid },
-                            SessionMessageType.Message,
-                            new MessageCommand
+                            SessionMessageType.GeneralCommand,
+                            new GeneralCommand
                             {
-                                Header = "Upcoming Show Reminder",
-                                Text = notificationText,
-                                TimeoutMs = 10000
+                                Name = GeneralCommandType.DisplayMessage,
+                                Arguments = new Dictionary<string, string>
+                                {
+                                    { "Header", "Upcoming Show Reminder" },
+                                    { "Text", notificationText },
+                                    { "TimeoutMs", "10000" }
+                                }
                             },
                             ct).ConfigureAwait(false);
                     }
