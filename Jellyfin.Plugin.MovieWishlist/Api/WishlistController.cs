@@ -404,6 +404,7 @@ namespace Jellyfin.Plugin.MovieWishlist.Api
             current.RemoveAfterRecorded = config.RemoveAfterRecorded;
             current.SkipIfInLibrary = config.SkipIfInLibrary;
             current.EnableNotifications = config.EnableNotifications;
+            current.SubscriptionDaysAhead = config.SubscriptionDaysAhead;
 
             Plugin.Instance.SaveConfiguration();
             _logger.LogInformation("Plugin configuration updated by admin.");

@@ -39,4 +39,9 @@ public class PluginConfiguration : BasePluginConfiguration
     /// when a recording is scheduled.
     /// </summary>
     public bool EnableNotifications { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets how many days ahead the channel reminder task looks for upcoming shows.
+    /// </summary>
+    public int SubscriptionDaysAhead { get; set; } = 1;
 }

@@ -22,5 +22,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         services.AddSingleton<LibraryCheckService>();
 
         services.AddSingleton<MediaBrowser.Model.Tasks.IScheduledTask, EpgScanTask>();
+        services.AddSingleton<MediaBrowser.Model.Tasks.IScheduledTask, ChannelReminderTask>();
     }
 }

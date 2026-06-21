@@ -779,6 +779,12 @@ const WishlistApp = (() => {
                     </label>
                 </div>
 
+                <div class="mw-form-group">
+                    <label for="mw-sub-days-ahead">Channel Reminder Look-ahead (days)</label>
+                    <input type="number" id="mw-sub-days-ahead" min="1" max="7" value="${escHtml(String(settings.subscriptionDaysAhead ?? 1))}">
+                    <div class="mw-hint">How many days ahead the channel reminder task scans for upcoming shows.</div>
+                </div>
+
                 <div class="mw-settings-actions">
                     <button type="submit" class="mw-btn mw-btn-primary" id="mw-save-btn">💾 Save Settings</button>
                     <button type="button" class="mw-btn mw-btn-secondary" id="mw-scan-btn">🔍 Scan Now</button>
@@ -817,7 +823,8 @@ const WishlistApp = (() => {
                 daysAheadToScan: parseInt(document.getElementById('mw-days-ahead').value, 10),
                 removeAfterRecorded: document.getElementById('mw-remove-after-record').checked,
                 skipIfInLibrary: document.getElementById('mw-skip-in-library').checked,
-                enableNotifications: document.getElementById('mw-enable-notifications').checked
+                enableNotifications: document.getElementById('mw-enable-notifications').checked,
+                subscriptionDaysAhead: parseInt(document.getElementById('mw-sub-days-ahead').value, 10)
             };
 
             try {
@@ -935,6 +942,247 @@ const WishlistApp = (() => {
     }
 
     // -------------------------------------------------------------------------
+    // Page: Subscriptions
+    // -------------------------------------------------------------------------
+
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function dayBit(index) { return 1 << index; }
+
+    function daysLabel(mask) {
+        if (mask === 127) return 'Every day';
+        if (mask === 0) return 'None';
+        return DAY_NAMES.filter((_, i) => (mask & dayBit(i)) !== 0).join(', ');
+    }
+
+    function renderDayCheckboxes(id, currentMask) {
+        return DAY_NAMES.map((day, i) => {
+            const checked = (currentMask & dayBit(i)) !== 0 ? 'checked' : '';
+            return `<label class="mw-day-label"><input type="checkbox" class="mw-day-cb" data-bit="${dayBit(i)}" ${checked}> ${day}</label>`;
+        }).join('');
+    }
+
+    function readDayMask(container) {
+        let mask = 0;
+        container.querySelectorAll('.mw-day-cb').forEach(cb => {
+            if (cb.checked) mask |= parseInt(cb.dataset.bit, 10);
+        });
+        return mask;
+    }
+
+    async function initSubscriptions() {
+        const area = document.getElementById('mw-subscriptions-area');
+        if (!area) return;
+
+        area.innerHTML = '<div class="mw-loading">Loading…</div>';
+        hideError('mw-error-box');
+
+        let channels = [];
+        let subscriptions = [];
+
+        try {
+            [channels, subscriptions] = await Promise.all([
+                apiGet('/channels'),
+                apiGet('/subscriptions')
+            ]);
+        } catch (err) {
+            area.innerHTML = '';
+            showError('mw-error-box', err.message);
+            return;
+        }
+
+        renderSubscriptionsPage(channels, subscriptions);
+
+        function renderSubscriptionsPage(chList, subList) {
+            area.innerHTML = '';
+
+            // ---- Add subscription form ----
+            const addSection = document.createElement('div');
+            addSection.className = 'mw-settings-form';
+            addSection.style.marginBottom = '28px';
+
+            const channelOptions = chList.length === 0
+                ? '<option value="">No Live TV channels found</option>'
+                : '<option value="">— select a channel —</option>' +
+                  chList.map(c => `<option value="${escHtml(c.id)}" data-name="${escHtml(c.name)}">${escHtml(c.name)}</option>`).join('');
+
+            addSection.innerHTML = `
+                <h3 style="margin-top:0;">Add Channel Subscription</h3>
+                <div class="mw-form-group">
+                    <label for="mw-sub-channel">Channel</label>
+                    <select id="mw-sub-channel">${channelOptions}</select>
+                </div>
+                <div class="mw-form-group">
+                    <label>Notify on days</label>
+                    <div id="mw-sub-days" class="mw-days-row">${renderDayCheckboxes('add', 127)}</div>
+                </div>
+                <div class="mw-settings-actions">
+                    <button class="mw-btn mw-btn-primary" id="mw-sub-add-btn">+ Subscribe</button>
+                </div>
+                <div class="mw-error" id="mw-sub-add-error" style="display:none;margin-top:8px;"></div>
+            `;
+            area.appendChild(addSection);
+
+            // ---- Existing subscriptions list ----
+            const listSection = document.createElement('div');
+            listSection.id = 'mw-sub-list';
+            area.appendChild(listSection);
+            renderSubList(listSection, subList);
+
+            // Wire add button
+            document.getElementById('mw-sub-add-btn').addEventListener('click', async () => {
+                const sel = document.getElementById('mw-sub-channel');
+                const channelId = sel.value;
+                const channelName = sel.options[sel.selectedIndex]?.dataset?.name || channelId;
+                const daysContainer = document.getElementById('mw-sub-days');
+                const daysOfWeek = readDayMask(daysContainer);
+                const errEl = document.getElementById('mw-sub-add-error');
+                errEl.style.display = 'none';
+
+                if (!channelId) {
+                    errEl.textContent = 'Please select a channel.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+                if (daysOfWeek === 0) {
+                    errEl.textContent = 'Please select at least one day.';
+                    errEl.style.display = 'block';
+                    return;
+                }
+
+                const btn = document.getElementById('mw-sub-add-btn');
+                btn.disabled = true;
+                btn.textContent = 'Subscribing…';
+                try {
+                    await apiPost('/subscriptions', { channelId, channelName, daysOfWeek });
+                    subscriptions = await apiGet('/subscriptions');
+                    renderSubList(listSection, subscriptions);
+                } catch (err) {
+                    errEl.textContent = err.message;
+                    errEl.style.display = 'block';
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = '+ Subscribe';
+                }
+            });
+        }
+
+        function renderSubList(container, subList) {
+            if (!subList || subList.length === 0) {
+                container.innerHTML = `
+                    <div class="mw-empty">
+                        <div style="font-size:2rem;margin-bottom:8px;">📺</div>
+                        <strong>No subscriptions yet.</strong>
+                        <p>Subscribe to a channel above to receive reminders when shows air on your chosen days.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '<h3>Your Subscriptions</h3>';
+
+            const list = document.createElement('div');
+            list.className = 'mw-sub-list';
+
+            subList.forEach(sub => {
+                const row = document.createElement('div');
+                row.className = 'mw-sub-row';
+                row.dataset.id = sub.id;
+
+                row.innerHTML = `
+                    <div class="mw-sub-info">
+                        <strong>${escHtml(sub.channelName || sub.channelId)}</strong>
+                        <span class="mw-sub-days-label" id="mw-days-label-${escHtml(String(sub.id))}">${escHtml(daysLabel(sub.daysOfWeek))}</span>
+                    </div>
+                    <div class="mw-sub-day-edit" id="mw-day-edit-${escHtml(String(sub.id))}" style="display:none;">
+                        <div class="mw-days-row">${renderDayCheckboxes('edit-' + sub.id, sub.daysOfWeek)}</div>
+                        <button class="mw-btn mw-btn-success mw-sub-save-btn" data-id="${escHtml(String(sub.id))}">Save</button>
+                        <button class="mw-btn mw-btn-secondary mw-sub-cancel-btn" data-id="${escHtml(String(sub.id))}">Cancel</button>
+                    </div>
+                    <div class="mw-sub-actions">
+                        <button class="mw-btn mw-btn-secondary mw-sub-edit-btn" data-id="${escHtml(String(sub.id))}">Edit days</button>
+                        <button class="mw-btn mw-btn-danger mw-sub-del-btn" data-id="${escHtml(String(sub.id))}">Remove</button>
+                    </div>
+                    <div class="mw-error mw-sub-err" data-id="${escHtml(String(sub.id))}" style="display:none;margin-top:4px;"></div>
+                `;
+
+                list.appendChild(row);
+            });
+
+            container.appendChild(list);
+
+            // Wire edit / save / cancel / delete
+            container.querySelectorAll('.mw-sub-edit-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    document.getElementById('mw-day-edit-' + id).style.display = '';
+                    btn.style.display = 'none';
+                });
+            });
+
+            container.querySelectorAll('.mw-sub-cancel-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    document.getElementById('mw-day-edit-' + id).style.display = 'none';
+                    container.querySelector(`.mw-sub-edit-btn[data-id="${id}"]`).style.display = '';
+                });
+            });
+
+            container.querySelectorAll('.mw-sub-save-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    const editDiv = document.getElementById('mw-day-edit-' + id);
+                    const daysOfWeek = readDayMask(editDiv);
+                    const errEl = container.querySelector(`.mw-sub-err[data-id="${id}"]`);
+                    errEl.style.display = 'none';
+
+                    if (daysOfWeek === 0) {
+                        errEl.textContent = 'Select at least one day.';
+                        errEl.style.display = 'block';
+                        return;
+                    }
+
+                    btn.disabled = true;
+                    try {
+                        await apiPut('/subscriptions/' + id, { daysOfWeek });
+                        document.getElementById('mw-days-label-' + id).textContent = daysLabel(daysOfWeek);
+                        editDiv.style.display = 'none';
+                        container.querySelector(`.mw-sub-edit-btn[data-id="${id}"]`).style.display = '';
+                    } catch (err) {
+                        errEl.textContent = err.message;
+                        errEl.style.display = 'block';
+                    } finally {
+                        btn.disabled = false;
+                    }
+                });
+            });
+
+            container.querySelectorAll('.mw-sub-del-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    const row = container.querySelector(`.mw-sub-row[data-id="${id}"]`);
+                    const channelName = row?.querySelector('strong')?.textContent || 'this channel';
+                    if (!confirm('Remove subscription for "' + channelName + '"?')) return;
+
+                    btn.disabled = true;
+                    try {
+                        await apiDelete('/subscriptions/' + id);
+                        row?.remove();
+                        subscriptions = subscriptions.filter(s => String(s.id) !== String(id));
+                        if (list.children.length === 0) {
+                            renderSubList(container, []);
+                        }
+                    } catch (err) {
+                        const errEl = container.querySelector(`.mw-sub-err[data-id="${id}"]`);
+                        if (errEl) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+                        btn.disabled = false;
+                    }
+                });
+            });
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
 
@@ -943,7 +1191,8 @@ const WishlistApp = (() => {
         initWatchlist,
         initConfirmations,
         initSettings,
-        initActivity
+        initActivity,
+        initSubscriptions
     };
 
 })();

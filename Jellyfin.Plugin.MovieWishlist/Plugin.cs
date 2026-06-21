@@ -68,6 +68,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 Name = "MovieWishlistActivity",
                 EmbeddedResourcePath = "Jellyfin.Plugin.MovieWishlist.Web.activity.html",
                 EnableInMainMenu = false
+            },
+            new PluginPageInfo
+            {
+                Name = "MovieWishlistSubscriptions",
+                EmbeddedResourcePath = "Jellyfin.Plugin.MovieWishlist.Web.subscriptions.html",
+                EnableInMainMenu = false
             }
         };
     }

@@ -838,6 +838,89 @@ body {
     margin-top: 4px;
 }
 
+/* Subscription page */
+.mw-days-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.mw-day-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #ccc;
+    user-select: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.mw-day-label:hover {
+    border-color: #e50914;
+}
+
+.mw-day-label input[type="checkbox"] {
+    accent-color: #e50914;
+    cursor: pointer;
+}
+
+.mw-sub-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.mw-sub-row {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+
+.mw-sub-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.mw-sub-info strong {
+    color: #fff;
+    font-size: 0.95rem;
+}
+
+.mw-sub-days-label {
+    color: #888;
+    font-size: 0.82rem;
+}
+
+.mw-sub-day-edit {
+    margin: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mw-sub-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.mw-sub-actions .mw-btn {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     .mw-grid {

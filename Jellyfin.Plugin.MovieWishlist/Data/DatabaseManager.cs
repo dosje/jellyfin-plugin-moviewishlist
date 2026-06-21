@@ -49,6 +49,25 @@ CREATE TABLE IF NOT EXISTS ActivityLogs (
     EventType TEXT NOT NULL,
     Message TEXT NOT NULL,
     WishlistItemId INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS ChannelSubscriptions (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId TEXT NOT NULL,
+    ChannelId TEXT NOT NULL,
+    ChannelName TEXT NOT NULL,
+    DaysOfWeek INTEGER NOT NULL DEFAULT 127,
+    CreatedAt TEXT NOT NULL,
+    UNIQUE(UserId, ChannelId)
+);
+
+CREATE TABLE IF NOT EXISTS ChannelReminderLog (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    SubscriptionId INTEGER NOT NULL,
+    ProgramId TEXT NOT NULL,
+    ProgramTitle TEXT NOT NULL,
+    ProgramStart TEXT NOT NULL,
+    NotifiedAt TEXT NOT NULL
 );";
         cmd.ExecuteNonQuery();
     }
@@ -269,6 +288,161 @@ VALUES (@Timestamp, @EventType, @Message, @WishlistItemId)";
         cmd.Parameters.AddWithValue("@WishlistItemId", log.WishlistItemId.HasValue ? log.WishlistItemId.Value : DBNull.Value);
 
         cmd.ExecuteNonQuery();
+    }
+
+    // ------------------- Channel Subscriptions -------------------
+
+    public List<ChannelSubscription> GetAllSubscriptions()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT * FROM ChannelSubscriptions";
+
+        using var reader = cmd.ExecuteReader();
+        var list = new List<ChannelSubscription>();
+        while (reader.Read())
+            list.Add(MapSubscription(reader));
+        return list;
+    }
+
+    public List<ChannelSubscription> GetSubscriptionsByUser(string userId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT * FROM ChannelSubscriptions WHERE UserId = @UserId";
+        cmd.Parameters.AddWithValue("@UserId", userId);
+
+        using var reader = cmd.ExecuteReader();
+        var list = new List<ChannelSubscription>();
+        while (reader.Read())
+            list.Add(MapSubscription(reader));
+        return list;
+    }
+
+    public ChannelSubscription? GetSubscriptionById(int id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT * FROM ChannelSubscriptions WHERE Id = @Id";
+        cmd.Parameters.AddWithValue("@Id", id);
+
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? MapSubscription(reader) : null;
+    }
+
+    public void AddSubscription(ChannelSubscription sub)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+INSERT OR IGNORE INTO ChannelSubscriptions (UserId, ChannelId, ChannelName, DaysOfWeek, CreatedAt)
+VALUES (@UserId, @ChannelId, @ChannelName, @DaysOfWeek, @CreatedAt);
+SELECT last_insert_rowid();";
+
+        cmd.Parameters.AddWithValue("@UserId", sub.UserId);
+        cmd.Parameters.AddWithValue("@ChannelId", sub.ChannelId);
+        cmd.Parameters.AddWithValue("@ChannelName", sub.ChannelName);
+        cmd.Parameters.AddWithValue("@DaysOfWeek", sub.DaysOfWeek);
+        cmd.Parameters.AddWithValue("@CreatedAt", sub.CreatedAt.ToString("O"));
+
+        var result = cmd.ExecuteScalar();
+        if (result != null && result != DBNull.Value)
+            sub.Id = Convert.ToInt32(result);
+    }
+
+    public void UpdateSubscription(ChannelSubscription sub)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+UPDATE ChannelSubscriptions SET ChannelName = @ChannelName, DaysOfWeek = @DaysOfWeek
+WHERE Id = @Id AND UserId = @UserId";
+
+        cmd.Parameters.AddWithValue("@Id", sub.Id);
+        cmd.Parameters.AddWithValue("@UserId", sub.UserId);
+        cmd.Parameters.AddWithValue("@ChannelName", sub.ChannelName);
+        cmd.Parameters.AddWithValue("@DaysOfWeek", sub.DaysOfWeek);
+
+        cmd.ExecuteNonQuery();
+    }
+
+    public void DeleteSubscription(int id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM ChannelSubscriptions WHERE Id = @Id";
+        cmd.Parameters.AddWithValue("@Id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    // ------------------- Channel Reminder Log -------------------
+
+    public bool HasReminderBeenSent(int subscriptionId, string programId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM ChannelReminderLog WHERE SubscriptionId = @SubId AND ProgramId = @ProgramId";
+        cmd.Parameters.AddWithValue("@SubId", subscriptionId);
+        cmd.Parameters.AddWithValue("@ProgramId", programId);
+
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+    }
+
+    public void AddReminderLog(ChannelReminderLog log)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+INSERT INTO ChannelReminderLog (SubscriptionId, ProgramId, ProgramTitle, ProgramStart, NotifiedAt)
+VALUES (@SubscriptionId, @ProgramId, @ProgramTitle, @ProgramStart, @NotifiedAt)";
+
+        cmd.Parameters.AddWithValue("@SubscriptionId", log.SubscriptionId);
+        cmd.Parameters.AddWithValue("@ProgramId", log.ProgramId);
+        cmd.Parameters.AddWithValue("@ProgramTitle", log.ProgramTitle);
+        cmd.Parameters.AddWithValue("@ProgramStart", log.ProgramStart.ToString("O"));
+        cmd.Parameters.AddWithValue("@NotifiedAt", log.NotifiedAt.ToString("O"));
+
+        cmd.ExecuteNonQuery();
+    }
+
+    public void CleanupOldReminderLogs(DateTime olderThan)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM ChannelReminderLog WHERE ProgramStart < @Cutoff";
+        cmd.Parameters.AddWithValue("@Cutoff", olderThan.ToString("O"));
+        cmd.ExecuteNonQuery();
+    }
+
+    private static ChannelSubscription MapSubscription(SqliteDataReader reader)
+    {
+        return new ChannelSubscription
+        {
+            Id = reader.GetInt32(reader.GetOrdinal("Id")),
+            UserId = reader.GetString(reader.GetOrdinal("UserId")),
+            ChannelId = reader.GetString(reader.GetOrdinal("ChannelId")),
+            ChannelName = reader.GetString(reader.GetOrdinal("ChannelName")),
+            DaysOfWeek = reader.GetInt32(reader.GetOrdinal("DaysOfWeek")),
+            CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt")))
+        };
     }
 
     private static WishlistItem MapItem(SqliteDataReader reader)
