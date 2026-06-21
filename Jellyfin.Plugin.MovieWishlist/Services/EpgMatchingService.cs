@@ -1,8 +1,8 @@
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.MovieWishlist.Data.Models;
 using Jellyfin.Plugin.MovieWishlist.Services.Dto;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Model.Querying;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.MovieWishlist.Services;
@@ -73,7 +73,7 @@ public class EpgMatchingService
                 var channelName = channelItem?.Name ?? channelId;
                 var isHd = channelName.Contains("HD", StringComparison.OrdinalIgnoreCase);
 
-                var startTime = program.StartDate ?? DateTime.MinValue;
+                var startTime = (program as IHasStartDate)?.StartDate ?? DateTime.MinValue;
                 var endTime = program.EndDate ?? DateTime.MinValue;
 
                 candidates.Add(new EpgMatch
