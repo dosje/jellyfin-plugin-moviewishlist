@@ -104,9 +104,11 @@ public class EpgMatchingService
 
             foreach (var candidate in candidates)
             {
+                // Uncertain when the wishlist item has a year but the EPG program's year
+                // is unknown (can't verify) or outside tolerance (different film).
                 bool yearInTolerance = !item.Year.HasValue
-                    || !candidate.ProgramYear.HasValue
-                    || Math.Abs(candidate.ProgramYear.Value - item.Year.Value) <= 1;
+                    || (candidate.ProgramYear.HasValue
+                        && Math.Abs(candidate.ProgramYear.Value - item.Year.Value) <= 1);
 
                 candidate.Confidence = (!yearInTolerance || multipleDistinctTitles)
                     ? MatchConfidence.Uncertain
