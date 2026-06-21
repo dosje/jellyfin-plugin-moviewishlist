@@ -128,19 +128,14 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
 
                     try
                     {
+                        var cmd = new GeneralCommand { Name = GeneralCommandType.DisplayMessage };
+                        cmd.Arguments["Header"] = "Upcoming Show Reminder";
+                        cmd.Arguments["Text"] = notificationText;
+                        cmd.Arguments["TimeoutMs"] = "10000";
                         await _sessionManager.SendMessageToUserSessions(
                             new List<Guid> { userGuid },
                             SessionMessageType.GeneralCommand,
-                            new GeneralCommand
-                            {
-                                Name = GeneralCommandType.DisplayMessage,
-                                Arguments = new Dictionary<string, string>
-                                {
-                                    { "Header", "Upcoming Show Reminder" },
-                                    { "Text", notificationText },
-                                    { "TimeoutMs", "10000" }
-                                }
-                            },
+                            cmd,
                             ct).ConfigureAwait(false);
                     }
                     catch (Exception ex)
