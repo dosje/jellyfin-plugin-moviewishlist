@@ -5,9 +5,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.MovieWishlist.Data;
 using Jellyfin.Plugin.MovieWishlist.Data.Models;
+using Jellyfin.Plugin.MovieWishlist.ScheduledTasks;
 using Jellyfin.Plugin.MovieWishlist.Services;
 using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Net;
+using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -32,6 +34,7 @@ namespace Jellyfin.Plugin.MovieWishlist.Api
         private readonly EpgMatchingService _epgMatcher;
         private readonly RecordingService _recorder;
         private readonly IAuthorizationContext _authContext;
+        private readonly ITaskManager _taskManager;
         private readonly ILogger<WishlistController> _logger;
 
         public WishlistController(
@@ -40,6 +43,7 @@ namespace Jellyfin.Plugin.MovieWishlist.Api
             EpgMatchingService epgMatcher,
             RecordingService recorder,
             IAuthorizationContext authContext,
+            ITaskManager taskManager,
             ILogger<WishlistController> logger)
         {
             _db = db;
@@ -47,6 +51,7 @@ namespace Jellyfin.Plugin.MovieWishlist.Api
             _epgMatcher = epgMatcher;
             _recorder = recorder;
             _authContext = authContext;
+            _taskManager = taskManager;
             _logger = logger;
         }
 
@@ -89,6 +94,11 @@ namespace Jellyfin.Plugin.MovieWishlist.Api
             if (userId == null)
             {
                 return Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Title))
+            {
+                return BadRequest(new { message = "Title is required." });
             }
 
             var existing = _db.GetWishlistItemByUserAndTmdb(userId.Value.ToString(), request.TmdbId);
@@ -370,6 +380,7 @@ namespace Jellyfin.Plugin.MovieWishlist.Api
             }
 
             _logger.LogInformation("Manual EPG scan requested by admin.");
+            _taskManager.CancelIfRunningAndQueue<EpgScanTask>();
             return Accepted(new { message = "Scan queued — use the Jellyfin scheduled task manager to monitor progress." });
         }
 

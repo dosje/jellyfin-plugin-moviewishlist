@@ -188,17 +188,17 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
                         }
 
                         // Check if timer already exists for this program
-                        bool hasTimer = false;
+                        string? existingTimerId = null;
                         try
                         {
-                            hasTimer = await _recorder.HasActiveTimerForProgramAsync(match.ProgramId, ct);
+                            existingTimerId = await _recorder.GetActiveTimerIdForProgramAsync(match.ProgramId, ct);
                         }
                         catch (Exception ex)
                         {
                             _logger.LogWarning(ex, "Could not check for existing timer for program {ProgramId}.", match.ProgramId);
                         }
 
-                        if (hasTimer)
+                        if (!string.IsNullOrEmpty(existingTimerId))
                         {
                             _logger.LogInformation("Active timer already exists for program {ProgramId}. Linking '{Title}'.", match.ProgramId, item.Title);
 
@@ -206,9 +206,16 @@ namespace Jellyfin.Plugin.MovieWishlist.ScheduledTasks
                             var itemsToLink = siblingItems.Where(s =>
                                 s.Status == WishlistStatus.WatchingEpg || s.Status == WishlistStatus.Missed).ToList();
 
+                            // Also include the current item if not already in list
+                            if (!itemsToLink.Any(s => s.Id == item.Id))
+                            {
+                                itemsToLink.Add(item);
+                            }
+
                             foreach (var toLink in itemsToLink)
                             {
                                 toLink.Status = WishlistStatus.Scheduled;
+                                toLink.JellyfinTimerId = existingTimerId;
                                 toLink.ScheduledAt = match.StartTime;
                                 toLink.ScheduledChannel = match.ChannelName;
                                 toLink.IsHd = match.IsHd;

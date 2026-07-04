@@ -90,32 +90,42 @@ const WishlistApp = (() => {
     // Private: Status helpers
     // -------------------------------------------------------------------------
 
-    // Status enum values from plugin
+    // Status enum values from plugin. The server serializes enums as strings
+    // ("WatchingEpg", ...); numeric values are also handled as a fallback.
     // 0=WatchingEpg, 1=Scheduled, 2=Recorded, 3=AlreadyInLibrary, 4=Missed, 5=NeedsConfirmation
+    const STATUS_NAMES = ['WatchingEpg', 'Scheduled', 'Recorded', 'AlreadyInLibrary', 'Missed', 'NeedsConfirmation'];
+
     const STATUS_LABELS = {
-        0: 'Watching EPG',
-        1: 'Scheduled',
-        2: 'Recorded',
-        3: 'In Library',
-        4: 'Missed',
-        5: 'Needs Confirmation'
+        WatchingEpg: 'Watching EPG',
+        Scheduled: 'Scheduled',
+        Recorded: 'Recorded',
+        AlreadyInLibrary: 'In Library',
+        Missed: 'Missed',
+        NeedsConfirmation: 'Needs Confirmation'
     };
 
     const STATUS_CLASSES = {
-        0: 'mw-badge-watchingepg',
-        1: 'mw-badge-scheduled',
-        2: 'mw-badge-recorded',
-        3: 'mw-badge-alreadyinlibrary',
-        4: 'mw-badge-missed',
-        5: 'mw-badge-needsconfirmation'
+        WatchingEpg: 'mw-badge-watchingepg',
+        Scheduled: 'mw-badge-scheduled',
+        Recorded: 'mw-badge-recorded',
+        AlreadyInLibrary: 'mw-badge-alreadyinlibrary',
+        Missed: 'mw-badge-missed',
+        NeedsConfirmation: 'mw-badge-needsconfirmation'
     };
 
+    function statusKey(status) {
+        if (typeof status === 'number') return STATUS_NAMES[status];
+        return status;
+    }
+
     function statusLabel(status) {
-        return STATUS_LABELS[status] !== undefined ? STATUS_LABELS[status] : 'Unknown';
+        const key = statusKey(status);
+        return STATUS_LABELS[key] !== undefined ? STATUS_LABELS[key] : 'Unknown';
     }
 
     function statusClass(status) {
-        return STATUS_CLASSES[status] !== undefined ? STATUS_CLASSES[status] : 'mw-badge-watchingepg';
+        const key = statusKey(status);
+        return STATUS_CLASSES[key] !== undefined ? STATUS_CLASSES[key] : 'mw-badge-watchingepg';
     }
 
     // -------------------------------------------------------------------------
@@ -185,18 +195,20 @@ const WishlistApp = (() => {
         try {
             const movie = await apiGet('/movie/' + tmdbId);
             const isInWatchlist = Array.isArray(wishlistItems)
-                && wishlistItems.some(i => String(i.tmdbId) === String(tmdbId));
+                && wishlistItems.some(i => String(i.TmdbId) === String(tmdbId));
 
-            const backdrop = backdropUrl(movie.backdropPath);
-            const poster = posterUrl(movie.posterPath);
+            // TMDB DTOs are serialized with their snake_case JsonPropertyName values
+            const backdrop = backdropUrl(movie.backdrop_path);
+            const poster = posterUrl(movie.poster_path);
 
-            const year = movie.releaseDate ? movie.releaseDate.substring(0, 4) : '';
+            const year = movie.release_date ? movie.release_date.substring(0, 4) : '';
             const runtime = movie.runtime ? movie.runtime + ' min' : '';
             const genres = Array.isArray(movie.genres)
                 ? movie.genres.map(g => '<span class="mw-genre-tag">' + escHtml(g.name || g) + '</span>').join('')
                 : '';
-            const cast = Array.isArray(movie.cast)
-                ? movie.cast.slice(0, 5).map(c => '<span class="mw-cast-item">' + escHtml(c.name || c) + '</span>').join('')
+            const castList = movie.credits && Array.isArray(movie.credits.cast) ? movie.credits.cast : null;
+            const cast = castList
+                ? castList.slice(0, 5).map(c => '<span class="mw-cast-item">' + escHtml(c.name || c) + '</span>').join('')
                 : '';
 
             let addBtn;
@@ -222,7 +234,7 @@ const WishlistApp = (() => {
                             <div class="mw-detail-meta">
                                 ${year ? '<span>' + escHtml(year) + '</span>' : ''}
                                 ${runtime ? '<span>⏱ ' + escHtml(runtime) + '</span>' : ''}
-                                ${movie.voteAverage ? '<span>' + renderStars(movie.voteAverage) + '</span>' : ''}
+                                ${movie.vote_average ? '<span>' + renderStars(movie.vote_average) + '</span>' : ''}
                             </div>
                             ${genres ? '<div class="mw-detail-genres">' + genres + '</div>' : ''}
                         </div>
@@ -255,14 +267,14 @@ const WishlistApp = (() => {
                             tmdbId: movie.id || tmdbId,
                             title: movie.title,
                             year: year ? parseInt(year, 10) : null,
-                            posterPath: movie.posterPath || null,
+                            posterPath: movie.poster_path || null,
                             overview: movie.overview || null
                         });
                         addBtnEl.textContent = '✓ In Watchlist';
                         addBtnEl.className = 'mw-btn mw-btn-muted';
                         // Push into wishlist so re-open reflects state
                         if (Array.isArray(wishlistItems)) {
-                            wishlistItems.push({ tmdbId: String(tmdbId) });
+                            wishlistItems.push({ TmdbId: String(tmdbId) });
                         }
                     } catch (err) {
                         document.getElementById('mw-detail-error').textContent = err.message;
@@ -288,19 +300,19 @@ const WishlistApp = (() => {
     // -------------------------------------------------------------------------
 
     function renderSearchCard(movie, wishlistItems) {
-        const year = movie.releaseDate ? movie.releaseDate.substring(0, 4) : '';
+        const year = movie.release_date ? movie.release_date.substring(0, 4) : '';
         const inWatchlist = Array.isArray(wishlistItems)
-            && wishlistItems.some(i => String(i.tmdbId) === String(movie.id));
+            && wishlistItems.some(i => String(i.TmdbId) === String(movie.id));
 
         const wrapper = document.createElement('div');
         wrapper.className = 'mw-card-wrapper';
 
         wrapper.innerHTML = `
             <div class="mw-card" data-tmdb-id="${escHtml(String(movie.id))}">
-                ${posterImgOrPlaceholder(movie.posterPath, movie.title)}
+                ${posterImgOrPlaceholder(movie.poster_path, movie.title)}
                 <div class="mw-card-body">
                     <div class="mw-card-title" title="${escHtml(movie.title || '')}">${escHtml(movie.title || 'Untitled')}</div>
-                    <div class="mw-card-meta">${escHtml(year)}${movie.voteAverage ? ' · ' + Number(movie.voteAverage).toFixed(1) + '★' : ''}</div>
+                    <div class="mw-card-meta">${escHtml(year)}${movie.vote_average ? ' · ' + Number(movie.vote_average).toFixed(1) + '★' : ''}</div>
                 </div>
             </div>
             ${inWatchlist ? '<div class="mw-badge mw-badge-watchingepg">Added</div>' : ''}
@@ -318,30 +330,30 @@ const WishlistApp = (() => {
     // -------------------------------------------------------------------------
 
     function renderWatchlistCard(item, onRemove) {
-        const year = item.year ? String(item.year) : '';
-        const status = item.status !== undefined ? item.status : 0;
+        const year = item.Year ? String(item.Year) : '';
+        const status = item.Status !== undefined ? item.Status : 'WatchingEpg';
         const badgeClass = statusClass(status);
         const badgeText = statusLabel(status);
 
         let scheduledHtml = '';
-        if (status === 1 && item.channelName) {
-            const dt = item.scheduledTime ? formatDateTime(item.scheduledTime) : '';
-            const hd = item.isHd ? '<span class="mw-hd-badge">HD</span>' : '';
-            scheduledHtml = `<div class="mw-card-scheduled">📡 ${escHtml(item.channelName)}${dt ? ' · ' + escHtml(dt) : ''} ${hd}</div>`;
+        if (statusKey(status) === 'Scheduled' && item.ScheduledChannel) {
+            const dt = item.ScheduledAt ? formatDateTime(item.ScheduledAt) : '';
+            const hd = item.IsHd ? '<span class="mw-hd-badge">HD</span>' : '';
+            scheduledHtml = `<div class="mw-card-scheduled">📡 ${escHtml(item.ScheduledChannel)}${dt ? ' · ' + escHtml(dt) : ''} ${hd}</div>`;
         }
 
         const wrapper = document.createElement('div');
         wrapper.className = 'mw-card-wrapper';
-        wrapper.dataset.itemId = item.id;
+        wrapper.dataset.itemId = item.Id;
 
         wrapper.innerHTML = `
             <div class="mw-card">
-                ${posterImgOrPlaceholder(item.posterPath, item.title)}
+                ${posterImgOrPlaceholder(item.PosterPath, item.Title)}
                 <div class="mw-card-body">
-                    <div class="mw-card-title" title="${escHtml(item.title || '')}">${escHtml(item.title || 'Untitled')}</div>
+                    <div class="mw-card-title" title="${escHtml(item.Title || '')}">${escHtml(item.Title || 'Untitled')}</div>
                     <div class="mw-card-meta">${escHtml(year)}</div>
                     ${scheduledHtml}
-                    <button class="mw-card-remove" data-id="${escHtml(String(item.id))}">✕ Remove</button>
+                    <button class="mw-card-remove" data-id="${escHtml(String(item.Id))}">✕ Remove</button>
                 </div>
             </div>
             <div class="mw-badge ${escHtml(badgeClass)}">${escHtml(badgeText)}</div>
@@ -349,8 +361,8 @@ const WishlistApp = (() => {
 
         wrapper.querySelector('.mw-card-remove').addEventListener('click', (e) => {
             e.stopPropagation();
-            if (confirm('Remove "' + (item.title || 'this movie') + '" from your watchlist?')) {
-                onRemove(item.id, wrapper);
+            if (confirm('Remove "' + (item.Title || 'this movie') + '" from your watchlist?')) {
+                onRemove(item.Id, wrapper);
             }
         });
 
@@ -393,8 +405,10 @@ const WishlistApp = (() => {
             hideError('mw-error-box');
             area.innerHTML = '<div class="mw-loading">Searching…</div>';
             try {
-                const results = await apiGet('/search?query=' + encodeURIComponent(query));
-                if (!results || results.length === 0) {
+                // Response is a TmdbSearchResponse object: { "results": [...], "total_results": n }
+                const data = await apiGet('/search?query=' + encodeURIComponent(query));
+                const results = data && Array.isArray(data.results) ? data.results : [];
+                if (results.length === 0) {
                     area.innerHTML = '<div class="mw-empty">No results found for <strong>' + escHtml(query) + '</strong>.</div>';
                     return;
                 }
@@ -503,10 +517,10 @@ const WishlistApp = (() => {
             area.innerHTML = '<div class="mw-loading">Loading…</div>';
             try {
                 const items = await apiGet('/items');
-                const pending = (items || []).filter(i => i.status === 5);
+                const pending = (items || []).filter(i => statusKey(i.Status) === 'NeedsConfirmation');
 
-                const uncertainMatches = pending.filter(i => i.pendingEpgProgramId && !i.conflictInfo);
-                const conflicts = pending.filter(i => i.conflictInfo);
+                const uncertainMatches = pending.filter(i => i.PendingEpgProgramId && !i.ConflictInfo);
+                const conflicts = pending.filter(i => i.ConflictInfo);
 
                 if (pending.length === 0) {
                     area.innerHTML = `
@@ -565,24 +579,24 @@ const WishlistApp = (() => {
             const box = document.createElement('div');
             box.className = 'mw-confirm-box';
 
-            const poster = posterUrl(item.posterPath);
-            const pendingTitle = item.pendingEpgTitle || 'Unknown Title';
-            const pendingYear = item.pendingEpgYear ? ' (' + item.pendingEpgYear + ')' : '';
+            const poster = posterUrl(item.PosterPath);
+            const pendingTitle = item.PendingEpgTitle || 'Unknown Title';
+            const pendingYear = item.PendingEpgYear ? ' (' + item.PendingEpgYear + ')' : '';
 
             box.innerHTML = `
                 <div class="mw-confirm-movie-row">
                     <div class="mw-confirm-poster">
                         ${poster
-                            ? '<img src="' + escHtml(poster) + '" alt="' + escHtml(item.title || '') + '">'
-                            : '<div class="mw-confirm-poster-placeholder">' + escHtml(item.title || '') + '</div>'}
+                            ? '<img src="' + escHtml(poster) + '" alt="' + escHtml(item.Title || '') + '">'
+                            : '<div class="mw-confirm-poster-placeholder">' + escHtml(item.Title || '') + '</div>'}
                     </div>
                     <div class="mw-confirm-info">
-                        <h3>${escHtml(item.title || 'Untitled')}${item.year ? ' <span style="color:#888;font-weight:400;">(' + escHtml(String(item.year)) + ')</span>' : ''}</h3>
+                        <h3>${escHtml(item.Title || 'Untitled')}${item.Year ? ' <span style="color:#888;font-weight:400;">(' + escHtml(String(item.Year)) + ')</span>' : ''}</h3>
                         <p>EPG found: <strong>${escHtml(pendingTitle + pendingYear)}</strong></p>
                         <p class="mw-confirm-question">Is this the right film?</p>
                         <div class="mw-confirm-actions">
-                            <button class="mw-btn mw-btn-success confirm-yes-btn" data-id="${escHtml(String(item.id))}">✅ Yes, schedule it</button>
-                            <button class="mw-btn mw-btn-secondary confirm-no-btn" data-id="${escHtml(String(item.id))}">❌ No, keep watching</button>
+                            <button class="mw-btn mw-btn-success confirm-yes-btn" data-id="${escHtml(String(item.Id))}">✅ Yes, schedule it</button>
+                            <button class="mw-btn mw-btn-secondary confirm-no-btn" data-id="${escHtml(String(item.Id))}">❌ No, keep watching</button>
                         </div>
                         <div class="mw-error confirm-err" style="display:none;margin-top:8px;"></div>
                     </div>
@@ -594,7 +608,7 @@ const WishlistApp = (() => {
                 btn.disabled = true;
                 btn.textContent = 'Confirming…';
                 try {
-                    await apiPost('/items/' + item.id + '/confirm');
+                    await apiPost('/items/' + item.Id + '/confirm');
                     box.remove();
                     onAction();
                 } catch (err) {
@@ -610,7 +624,7 @@ const WishlistApp = (() => {
                 btn.disabled = true;
                 btn.textContent = 'Rejecting…';
                 try {
-                    await apiPost('/items/' + item.id + '/reject');
+                    await apiPost('/items/' + item.Id + '/reject');
                     box.remove();
                     onAction();
                 } catch (err) {
@@ -630,7 +644,7 @@ const WishlistApp = (() => {
 
             let conflictData = { conflicts: [] };
             try {
-                conflictData = JSON.parse(item.conflictInfo);
+                conflictData = JSON.parse(item.ConflictInfo);
             } catch (e) {
                 // leave empty
             }
@@ -653,17 +667,17 @@ const WishlistApp = (() => {
                 `;
             }).join('');
 
-            const poster = posterUrl(item.posterPath);
+            const poster = posterUrl(item.PosterPath);
 
             box.innerHTML = `
                 <div class="mw-confirm-movie-row" style="margin-bottom:12px;">
                     <div class="mw-confirm-poster">
                         ${poster
-                            ? '<img src="' + escHtml(poster) + '" alt="' + escHtml(item.title || '') + '">'
-                            : '<div class="mw-confirm-poster-placeholder">' + escHtml(item.title || '') + '</div>'}
+                            ? '<img src="' + escHtml(poster) + '" alt="' + escHtml(item.Title || '') + '">'
+                            : '<div class="mw-confirm-poster-placeholder">' + escHtml(item.Title || '') + '</div>'}
                     </div>
                     <div class="mw-confirm-info">
-                        <h3>${escHtml(item.title || 'Untitled')}${item.year ? ' <span style="color:#888;font-weight:400;">(' + escHtml(String(item.year)) + ')</span>' : ''}</h3>
+                        <h3>${escHtml(item.Title || 'Untitled')}${item.Year ? ' <span style="color:#888;font-weight:400;">(' + escHtml(String(item.Year)) + ')</span>' : ''}</h3>
                         <p>Multiple broadcasts found. Choose which one to record:</p>
                     </div>
                 </div>
@@ -677,7 +691,7 @@ const WishlistApp = (() => {
                     e.currentTarget.disabled = true;
                     e.currentTarget.textContent = 'Scheduling…';
                     try {
-                        await apiPost('/items/' + item.id + '/resolve', { chosenProgramId: programId });
+                        await apiPost('/items/' + item.Id + '/resolve', { chosenProgramId: programId });
                         box.remove();
                         onAction();
                     } catch (err) {
@@ -738,50 +752,50 @@ const WishlistApp = (() => {
             <form class="mw-settings-form" id="mw-settings-form" autocomplete="off">
                 <div class="mw-form-group">
                     <label for="mw-tmdb-key">TMDB API Key</label>
-                    <input type="password" id="mw-tmdb-key" placeholder="Enter your TMDB API key" value="${escHtml(settings.tmdbApiKey || '')}">
+                    <input type="password" id="mw-tmdb-key" placeholder="Enter your TMDB API key" value="${escHtml(settings.TmdbApiKey || '')}">
                     <div class="mw-hint">Get a free key at <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener" style="color:#e50914;">themoviedb.org</a></div>
                 </div>
 
                 <div class="mw-form-group">
                     <label for="mw-epg-interval">EPG Scan Interval</label>
                     <select id="mw-epg-interval">
-                        <option value="1"  ${settings.scanIntervalHours === 1  ? 'selected' : ''}>Every 1 hour</option>
-                        <option value="3"  ${settings.scanIntervalHours === 3  ? 'selected' : ''}>Every 3 hours</option>
-                        <option value="6"  ${settings.scanIntervalHours === 6  ? 'selected' : ''}>Every 6 hours</option>
-                        <option value="12" ${settings.scanIntervalHours === 12 ? 'selected' : ''}>Every 12 hours</option>
-                        <option value="24" ${settings.scanIntervalHours === 24 ? 'selected' : ''}>Every 24 hours</option>
+                        <option value="1"  ${settings.ScanIntervalHours === 1  ? 'selected' : ''}>Every 1 hour</option>
+                        <option value="3"  ${settings.ScanIntervalHours === 3  ? 'selected' : ''}>Every 3 hours</option>
+                        <option value="6"  ${settings.ScanIntervalHours === 6  ? 'selected' : ''}>Every 6 hours</option>
+                        <option value="12" ${settings.ScanIntervalHours === 12 ? 'selected' : ''}>Every 12 hours</option>
+                        <option value="24" ${settings.ScanIntervalHours === 24 ? 'selected' : ''}>Every 24 hours</option>
                     </select>
                 </div>
 
                 <div class="mw-form-group">
                     <label for="mw-days-ahead">Days Ahead to Scan</label>
-                    <input type="number" id="mw-days-ahead" min="1" max="14" value="${escHtml(String(settings.daysAheadToScan || 7))}">
+                    <input type="number" id="mw-days-ahead" min="1" max="14" value="${escHtml(String(settings.DaysAheadToScan || 7))}">
                 </div>
 
                 <div class="mw-form-group">
                     <label class="mw-checkbox-label">
-                        <input type="checkbox" id="mw-remove-after-record" ${settings.removeAfterRecorded ? 'checked' : ''}>
+                        <input type="checkbox" id="mw-remove-after-record" ${settings.RemoveAfterRecorded ? 'checked' : ''}>
                         Remove from Watchlist After Recorded
                     </label>
                 </div>
 
                 <div class="mw-form-group">
                     <label class="mw-checkbox-label">
-                        <input type="checkbox" id="mw-skip-in-library" ${settings.skipIfInLibrary ? 'checked' : ''}>
+                        <input type="checkbox" id="mw-skip-in-library" ${settings.SkipIfInLibrary ? 'checked' : ''}>
                         Skip If Film Already in Library
                     </label>
                 </div>
 
                 <div class="mw-form-group">
                     <label class="mw-checkbox-label">
-                        <input type="checkbox" id="mw-enable-notifications" ${settings.enableNotifications ? 'checked' : ''}>
+                        <input type="checkbox" id="mw-enable-notifications" ${settings.EnableNotifications ? 'checked' : ''}>
                         Enable Notifications
                     </label>
                 </div>
 
                 <div class="mw-form-group">
                     <label for="mw-sub-days-ahead">Channel Reminder Look-ahead (days)</label>
-                    <input type="number" id="mw-sub-days-ahead" min="1" max="7" value="${escHtml(String(settings.subscriptionDaysAhead ?? 1))}">
+                    <input type="number" id="mw-sub-days-ahead" min="1" max="7" value="${escHtml(String(settings.SubscriptionDaysAhead ?? 1))}">
                     <div class="mw-hint">How many days ahead the channel reminder task scans for upcoming shows.</div>
                 </div>
 
@@ -915,11 +929,11 @@ const WishlistApp = (() => {
                 entries.forEach(entry => {
                     const li = document.createElement('li');
                     li.className = 'mw-activity-item';
-                    const evtClass = eventClass(entry.eventType);
+                    const evtClass = eventClass(entry.EventType);
                     li.innerHTML = `
-                        <span class="mw-activity-time">${escHtml(formatDateTime(entry.timestamp))}</span>
-                        <span class="mw-activity-type ${escHtml(evtClass)}">${escHtml(entry.eventType || 'Info')}</span>
-                        <span class="mw-activity-msg">${escHtml(entry.message || '')}</span>
+                        <span class="mw-activity-time">${escHtml(formatDateTime(entry.Timestamp))}</span>
+                        <span class="mw-activity-type ${escHtml(evtClass)}">${escHtml(entry.EventType || 'Info')}</span>
+                        <span class="mw-activity-msg">${escHtml(entry.Message || '')}</span>
                     `;
                     list.appendChild(li);
                 });
@@ -1087,23 +1101,23 @@ const WishlistApp = (() => {
             subList.forEach(sub => {
                 const row = document.createElement('div');
                 row.className = 'mw-sub-row';
-                row.dataset.id = sub.id;
+                row.dataset.id = sub.Id;
 
                 row.innerHTML = `
                     <div class="mw-sub-info">
-                        <strong>${escHtml(sub.channelName || sub.channelId)}</strong>
-                        <span class="mw-sub-days-label" id="mw-days-label-${escHtml(String(sub.id))}">${escHtml(daysLabel(sub.daysOfWeek))}</span>
+                        <strong>${escHtml(sub.ChannelName || sub.ChannelId)}</strong>
+                        <span class="mw-sub-days-label" id="mw-days-label-${escHtml(String(sub.Id))}">${escHtml(daysLabel(sub.DaysOfWeek))}</span>
                     </div>
-                    <div class="mw-sub-day-edit" id="mw-day-edit-${escHtml(String(sub.id))}" style="display:none;">
-                        <div class="mw-days-row">${renderDayCheckboxes('edit-' + sub.id, sub.daysOfWeek)}</div>
-                        <button class="mw-btn mw-btn-success mw-sub-save-btn" data-id="${escHtml(String(sub.id))}">Save</button>
-                        <button class="mw-btn mw-btn-secondary mw-sub-cancel-btn" data-id="${escHtml(String(sub.id))}">Cancel</button>
+                    <div class="mw-sub-day-edit" id="mw-day-edit-${escHtml(String(sub.Id))}" style="display:none;">
+                        <div class="mw-days-row">${renderDayCheckboxes('edit-' + sub.Id, sub.DaysOfWeek)}</div>
+                        <button class="mw-btn mw-btn-success mw-sub-save-btn" data-id="${escHtml(String(sub.Id))}">Save</button>
+                        <button class="mw-btn mw-btn-secondary mw-sub-cancel-btn" data-id="${escHtml(String(sub.Id))}">Cancel</button>
                     </div>
                     <div class="mw-sub-actions">
-                        <button class="mw-btn mw-btn-secondary mw-sub-edit-btn" data-id="${escHtml(String(sub.id))}">Edit days</button>
-                        <button class="mw-btn mw-btn-danger mw-sub-del-btn" data-id="${escHtml(String(sub.id))}">Remove</button>
+                        <button class="mw-btn mw-btn-secondary mw-sub-edit-btn" data-id="${escHtml(String(sub.Id))}">Edit days</button>
+                        <button class="mw-btn mw-btn-danger mw-sub-del-btn" data-id="${escHtml(String(sub.Id))}">Remove</button>
                     </div>
-                    <div class="mw-error mw-sub-err" data-id="${escHtml(String(sub.id))}" style="display:none;margin-top:4px;"></div>
+                    <div class="mw-error mw-sub-err" data-id="${escHtml(String(sub.Id))}" style="display:none;margin-top:4px;"></div>
                 `;
 
                 list.appendChild(row);
@@ -1168,7 +1182,7 @@ const WishlistApp = (() => {
                     try {
                         await apiDelete('/subscriptions/' + id);
                         row?.remove();
-                        subscriptions = subscriptions.filter(s => String(s.id) !== String(id));
+                        subscriptions = subscriptions.filter(s => String(s.Id) !== String(id));
                         if (list.children.length === 0) {
                             renderSubList(container, []);
                         }

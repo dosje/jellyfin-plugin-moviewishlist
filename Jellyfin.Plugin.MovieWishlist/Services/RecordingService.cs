@@ -49,19 +49,27 @@ public class RecordingService
 
     public async Task<bool> HasActiveTimerForProgramAsync(string programId, CancellationToken ct)
     {
+        return await GetActiveTimerIdForProgramAsync(programId, ct).ConfigureAwait(false) != null;
+    }
+
+    /// <summary>Returns the ID of an active (non-cancelled, non-errored) timer for the given program, or null if none exists.</summary>
+    public async Task<string?> GetActiveTimerIdForProgramAsync(string programId, CancellationToken ct)
+    {
         try
         {
             var timers = await _liveTvManager.GetTimers(new TimerQuery(), ct).ConfigureAwait(false);
 
-            return timers.Items.Any(t =>
+            var timer = timers.Items.FirstOrDefault(t =>
                 string.Equals(t.ProgramId, programId, StringComparison.Ordinal) &&
                 t.Status != RecordingStatus.Cancelled &&
                 t.Status != RecordingStatus.Error);
+
+            return timer?.Id;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to check active timers for program '{ProgramId}'", programId);
-            return false;
+            return null;
         }
     }
 }
